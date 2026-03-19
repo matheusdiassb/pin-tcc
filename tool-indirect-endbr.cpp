@@ -56,7 +56,8 @@ VOID VerificarDestinoEndbr(ADDRINT targetAddr,
 VOID InstrumentarInstrucoes(INS ins, VOID *v)
 {
     // Filtra apenas desvios/chamadas indiretas (branches e calls indiretos).
-    if (!INS_IsIndirectBranchOrCall(ins))
+    if (INS_IsIndirectControlFlow(ins) &&
+    (INS_IsCall(ins) || INS_IsBranch(ins)))
     {
         return;
     }
