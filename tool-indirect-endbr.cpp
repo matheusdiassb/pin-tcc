@@ -7,13 +7,25 @@
 // e verifica se a primeira instrução no destino é um endbr64 (F3 0F 1E FA).
 VOID VerificarDestinoEndbr(ADDRINT targetAddr,
                            ADDRINT origemAddr,
-                           const std::string *origemDisasm)
+                           const std::string *origemDisasm,
+                           const std::string *nomeImg,
+                           const std::string *nomeRtn)
 {
     // Buffer para leitura segura dos 4 bytes da instrução de destino
     unsigned char bytes[4] = {0};
     size_t copied = PIN_SafeCopy(bytes, reinterpret_cast<const VOID *>(targetAddr), sizeof(bytes));
 
     std::cout << "\n[PIN] Desvio/Chamada indireta tomada" << std::endl;
+
+    if (nomeImg)
+    {
+        std::cout << "  Modulo origem: " << *nomeImg << std::endl;
+    }
+    if (nomeRtn)
+    {
+        std::cout << "  Rotina origem: " << *nomeRtn << std::endl;
+    }
+
     std::cout << "  Origem: 0x" << std::hex << origemAddr;
 
     if (origemDisasm)
@@ -65,11 +77,29 @@ VOID InstrumentarInstrucoes(INS ins, VOID *v)
         return;
     }
 
+    // Filtra para considerar apenas instruções pertencentes ao executável principal.
+    IMG img = IMG_FindByAddress(INS_Address(ins));
+    if (!IMG_Valid(img) || !IMG_IsMainExecutable(img))
+    {
+        return;
+    }
+
     // Endereco da instrucao de origem (para log).
     ADDRINT origemAddr = INS_Address(ins);
 
     // Disassembly/mnemonico da instrucao de origem (para log).
     std::string *origemDisasm = new std::string(INS_Disassemble(ins));
+
+    // Nome do modulo (imagem) de origem.
+    std::string *nomeImg = new std::string(IMG_Name(img));
+
+    // Nome da rotina de origem, se existir.
+    RTN rtn = INS_Rtn(ins);
+    std::string *nomeRtn = nullptr;
+    if (RTN_Valid(rtn))
+    {
+        nomeRtn = new std::string(RTN_Name(rtn));
+    }
 
     // Inserimos a chamada no ponto em que o desvio eh realmente tomado.
     INS_InsertCall(ins,
@@ -78,6 +108,8 @@ VOID InstrumentarInstrucoes(INS ins, VOID *v)
                    IARG_BRANCH_TARGET_ADDR,          // endereco real de destino em tempo de execucao
                    IARG_ADDRINT, origemAddr,         // endereco da instrucao de origem
                    IARG_PTR, origemDisasm,           // disassembly da instrucao de origem
+                   IARG_PTR, nomeImg,                // nome do modulo de origem
+                   IARG_PTR, nomeRtn,                // nome da rotina de origem (pode ser nulo)
                    IARG_END);
 }
 
